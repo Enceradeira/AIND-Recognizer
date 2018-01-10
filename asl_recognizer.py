@@ -185,6 +185,15 @@ asl.df[features_polar[3]] = calculate_polar_theta(features_norm[2],features_norm
 
 features_delta = ['delta-rx', 'delta-ry', 'delta-lx', 'delta-ly']
 
+def calculate_diff(column):
+    return asl.df[column].diff().fillna(0)
+
+asl.df[features_delta[0]] = calculate_diff(features_norm[0])
+asl.df[features_delta[1]] = calculate_diff(features_norm[1])
+asl.df[features_delta[2]] = calculate_diff(features_norm[2])
+asl.df[features_delta[3]] = calculate_diff(features_norm[3])
+
+
 # In[ ]:
 
 # TODO add features of your own design, which may be a combination of the above or something else
