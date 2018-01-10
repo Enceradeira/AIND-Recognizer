@@ -85,14 +85,14 @@ features_ground = ['grnd-rx', 'grnd-ry', 'grnd-lx', 'grnd-ly']
 
 # In[19]:
 
-training = asl.build_training(features_ground)
-print("Training words: {}".format(training.words))
-
-# The training data in `training` is an object of class `WordsData` defined in the `asl_data` module.  in addition to the `words` list, data can be accessed with the `get_all_sequences`, `get_all_Xlengths`, `get_word_sequences`, and `get_word_Xlengths` methods. We need the `get_word_Xlengths` method to train multiple sequences with the `hmmlearn` library.  In the following example, notice that there are two lists; the first is a concatenation of all the sequences(the X portion) and the second is a list of the sequence lengths(the Lengths portion).
-
-# In[20]:
-
-training.get_word_Xlengths('CHOCOLATE')
+# training = asl.build_training(features_ground)
+# print("Training words: {}".format(training.words))
+#
+# # The training data in `training` is an object of class `WordsData` defined in the `asl_data` module.  in addition to the `words` list, data can be accessed with the `get_all_sequences`, `get_all_Xlengths`, `get_word_sequences`, and `get_word_Xlengths` methods. We need the `get_word_Xlengths` method to train multiple sequences with the `hmmlearn` library.  In the following example, notice that there are two lists; the first is a concatenation of all the sequences(the X portion) and the second is a list of the sequence lengths(the Lengths portion).
+#
+# # In[20]:
+#
+# training.get_word_Xlengths('CHOCOLATE')
 
 # ###### More feature sets
 # So far we have a simple feature set that is enough to get started modeling.  However, we might get better results if we manipulate the raw values a bit more, so we will go ahead and set up some other options now for experimentation later.  For example, we could normalize each speaker's range of motion with grouped statistics using [Pandas stats](http://pandas.pydata.org/pandas-docs/stable/api.html#api-dataframe-stats) functions and [pandas groupby](http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.groupby.html).  Below is an example for finding the means of all speaker subgroups.
@@ -148,6 +148,19 @@ test_std_tryit(df_std)
 # using Z-score scaling (X-Xmean)/Xstd
 
 features_norm = ['norm-rx', 'norm-ry', 'norm-lx', 'norm-ly']
+
+def calculate_norm(coordinate):
+    speaker = asl.df['speaker']
+    return (asl.df[coordinate] - (speaker.map(df_means[coordinate]))) / (speaker.map(df_std[coordinate]))
+
+asl.df[features_norm[0]] = calculate_norm('grnd-rx')
+asl.df[features_norm[1]] = calculate_norm('grnd-ry')
+asl.df[features_norm[2]] = calculate_norm('grnd-lx')
+asl.df[features_norm[3]] = calculate_norm('grnd-ly')
+
+man_1 = asl.df[asl.df.speaker == 'man-1']
+woman_1 = asl.df[asl.df.speaker == 'woman-1']
+
 
 # In[ ]:
 
@@ -542,4 +555,3 @@ unittest.TextTestRunner().run(suite)
 # create a DataFrame of log likelihoods for the test word items
 df_probs = pd.DataFrame(data=probabilities)
 df_probs.head()
-
