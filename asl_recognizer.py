@@ -158,17 +158,25 @@ asl.df[features_norm[1]] = calculate_norm('grnd-ry')
 asl.df[features_norm[2]] = calculate_norm('grnd-lx')
 asl.df[features_norm[3]] = calculate_norm('grnd-ly')
 
-man_1 = asl.df[asl.df.speaker == 'man-1']
-woman_1 = asl.df[asl.df.speaker == 'woman-1']
-
-
 # In[ ]:
 
 # TODO add features for polar coordinate values where the nose is the origin
 # Name these 'polar-rr', 'polar-rtheta', 'polar-lr', and 'polar-ltheta'
 # Note that 'polar-rr' and 'polar-rtheta' refer to the radius and angle
 
+#import numpy as np
 features_polar = ['polar-rr', 'polar-rtheta', 'polar-lr', 'polar-ltheta']
+
+def calculate_polar_radius(x, y):
+    return (asl.df[x].pow(2) + asl.df[y].pow(2)).pow(0.5)
+
+def calculate_polar_theta(x, y):
+    return np.arctan2(asl.df[x],asl.df[y])
+
+asl.df[features_polar[0]] = calculate_polar_radius(features_norm[0],features_norm[1])
+asl.df[features_polar[1]] = calculate_polar_theta(features_norm[0],features_norm[1])
+asl.df[features_polar[2]] = calculate_polar_radius(features_norm[2],features_norm[3])
+asl.df[features_polar[3]] = calculate_polar_theta(features_norm[2],features_norm[3])
 
 # In[ ]:
 
