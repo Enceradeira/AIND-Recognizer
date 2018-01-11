@@ -153,10 +153,10 @@ def calculate_norm(coordinate):
     speaker = asl.df['speaker']
     return (asl.df[coordinate] - (speaker.map(df_means[coordinate]))) / (speaker.map(df_std[coordinate]))
 
-asl.df[features_norm[0]] = calculate_norm('grnd-rx')
-asl.df[features_norm[1]] = calculate_norm('grnd-ry')
-asl.df[features_norm[2]] = calculate_norm('grnd-lx')
-asl.df[features_norm[3]] = calculate_norm('grnd-ly')
+asl.df[features_norm[0]] = calculate_norm('right-x')
+asl.df[features_norm[1]] = calculate_norm('right-y')
+asl.df[features_norm[2]] = calculate_norm('left-x')
+asl.df[features_norm[3]] = calculate_norm('left-y')
 
 # In[ ]:
 
@@ -173,10 +173,10 @@ def calculate_polar_radius(x, y):
 def calculate_polar_theta(x, y):
     return np.arctan2(asl.df[x],asl.df[y])
 
-asl.df[features_polar[0]] = calculate_polar_radius(features_norm[0],features_norm[1])
-asl.df[features_polar[1]] = calculate_polar_theta(features_norm[0],features_norm[1])
-asl.df[features_polar[2]] = calculate_polar_radius(features_norm[2],features_norm[3])
-asl.df[features_polar[3]] = calculate_polar_theta(features_norm[2],features_norm[3])
+asl.df[features_polar[0]] = calculate_polar_radius('grnd-rx','grnd-ry')
+asl.df[features_polar[1]] = calculate_polar_theta('grnd-rx','grnd-ry')
+asl.df[features_polar[2]] = calculate_polar_radius('grnd-lx','grnd-ly')
+asl.df[features_polar[3]] = calculate_polar_theta('grnd-lx','grnd-ly')
 
 # In[ ]:
 
@@ -188,10 +188,10 @@ features_delta = ['delta-rx', 'delta-ry', 'delta-lx', 'delta-ly']
 def calculate_diff(column):
     return asl.df[column].diff().fillna(0)
 
-asl.df[features_delta[0]] = calculate_diff(features_norm[0])
-asl.df[features_delta[1]] = calculate_diff(features_norm[1])
-asl.df[features_delta[2]] = calculate_diff(features_norm[2])
-asl.df[features_delta[3]] = calculate_diff(features_norm[3])
+asl.df[features_delta[0]] = calculate_diff('right-x')
+asl.df[features_delta[1]] = calculate_diff('right-y')
+asl.df[features_delta[2]] = calculate_diff('left-x')
+asl.df[features_delta[3]] = calculate_diff('left-y')
 
 
 # In[ ]:
