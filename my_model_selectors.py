@@ -32,12 +32,15 @@ class ModelSelector(object):
         raise NotImplementedError
 
     def base_model(self, num_states):
+        return self.create_and_fit_model(num_states, self.X, self.lengths)
+
+    def create_and_fit_model(self, num_states, x, lengths):
         # with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         # warnings.filterwarnings("ignore", category=RuntimeWarning)
         try:
             hmm_model = GaussianHMM(n_components=num_states, covariance_type="diag", n_iter=1000,
-                                    random_state=self.random_state, verbose=False).fit(self.X, self.lengths)
+                                    random_state=self.random_state, verbose=False).fit(x, lengths)
             if self.verbose:
                 print("model created for {} with {} states".format(self.this_word, num_states))
             return hmm_model
@@ -105,5 +108,39 @@ class SelectorCV(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+        trials = range(self.min_n_components, self.max_n_components)
+        models_and_scores = list(map(self.scoreTrial, trials))
+        best_model_and_score = max(models_and_scores, key=lambda ms: ms[1])
+        return self.base_model(best_model_and_score[0])
+
+    def scoreTrial(self, nr_components):
+        nr_cross_validation_sets = min(3, len(self.sequences))
+        splits = KFold(n_splits=nr_cross_validation_sets).split(self.sequences)
+
+        # the mean of all cross-validation folds for the scored nr_components
+        scores = list(map(lambda split: self.scoreTrialWithFold(split, nr_components), splits))
+        return nr_components, statistics.mean(scores)
+
+    def scoreTrialWithFold(self, fold_split, nr_components):
+        train_indices = fold_split[0]
+        test_indices = fold_split[1]
+
+        def split_sequences(indices):
+            training_sequences = [self.sequences[i] for i in indices]
+            training_x = [evt for sequence in training_sequences for evt in sequence]
+            training_lengths = [len(sequence) for sequence in training_sequences]
+            return training_x, training_lengths
+
+        # training using 'training part' of test-set
+        training_x, training_lengths = split_sequences(train_indices)
+        model = self.create_and_fit_model(nr_components, training_x, training_lengths)
+        if not model:
+            return -math.inf
+
+        # score using 'test part' of test-set
+        test_x, test_lengths = split_sequences(test_indices)
+        try:
+            return model.score(test_x, test_lengths)
+        except ValueError:
+            # invalid model
+            return -math.inf
