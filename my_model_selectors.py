@@ -78,47 +78,54 @@ class ModelSelectorUsingCV(ModelSelector, ABC):
         best_model_and_score = max(models_and_scores, key=lambda ms: ms[1])
         return self.base_model(best_model_and_score[0])
 
+    def split_sequences(self, indices):
+        training_sequences = [self.sequences[i] for i in indices]
+        training_x = [evt for sequence in training_sequences for evt in sequence]
+        training_lengths = [len(sequence) for sequence in training_sequences]
+        return training_x, training_lengths
+
+    def iterate_sequences(self, indices):
+        sequence, lengths = self.split_sequences(indices)
+        begin = 0
+        for length in lengths:
+            yield sequence[begin:begin + length]
+            begin = begin + length
+
     def scoreTrial(self, nr_components):
         nr_cross_validation_sets = min(3, len(self.sequences))
         splits = KFold(n_splits=nr_cross_validation_sets).split(self.sequences)
 
         # the mean of all cross-validation folds for the scored nr_components
         scores = list(map(lambda split: self.scoreTrialWithFold(split, nr_components), splits))
-        return nr_components, statistics.mean(scores)
+        flattened_scores = [val for sublist in scores for val in sublist]
+        return nr_components, statistics.mean(flattened_scores)
 
     def scoreTrialWithFold(self, fold_split, nr_components):
         train_indices = fold_split[0]
         test_indices = fold_split[1]
 
-        def split_sequences(indices):
-            training_sequences = [self.sequences[i] for i in indices]
-            training_x = [evt for sequence in training_sequences for evt in sequence]
-            training_lengths = [len(sequence) for sequence in training_sequences]
-            return training_x, training_lengths
-
         # training using 'training part' of test-set
-        training_x, training_lengths = split_sequences(train_indices)
+        training_x, training_lengths = self.split_sequences(train_indices)
         model = self.create_and_fit_model(nr_components, training_x, training_lengths)
         if not model:
-            return -math.inf
-
-        # score using 'test part' of test-set
-        test_x, test_lengths = split_sequences(test_indices)
-        try:
-            return self.score(model, test_x, test_lengths)
-        except ValueError:
-            # invalid model
-            return -math.inf
+            yield -math.inf
+        else:
+            # score using 'test part' of test-set
+            for test_x in self.iterate_sequences(test_indices):
+                try:
+                    yield self.score(model, test_x)
+                except ValueError:
+                    # invalid model
+                    yield -math.inf
 
     @abstractmethod
-    def score(self, model, x, x_lengths):
-        '''
+    def score(self, model, x):
+        """
         Generates the score for a given model using the observations x
         :param model: the model being scored
-        :param x: observations to be scored by the model (contains several X (words))
-        :param x_lengths: length of each X (word) in observations
+        :param x: observation X to be scored by the model
         :return: calculated score. The model with highest score is the best.
-        '''
+        """
         pass
 
 
@@ -129,15 +136,14 @@ class SelectorBIC(ModelSelectorUsingCV):
     Bayesian information criteria: BIC = -2 * logL + p * logN
     """
 
-    def score(self, model, x, x_lengths):
-        '''
-        Generates the score for a given model using the observations x
-        :param model: the model being scored
-        :param x: observations to be scored by the model (contains several X (words))
-        :param x_lengths: length of each X (word) in observations
-        :return: calculated score. The model with highest score is the best.
-        '''
-        log_likelihood = model.score(x, x_lengths)
+    def score(self, model, x):
+        """
+       Generates the score for a given model using the observations x
+       :param model: the model being scored
+       :param x: observation X to be scored by the model
+       :return: calculated score. The model with highest score is the best.
+       """
+        log_likelihood = model.score(x, [len(x)])
         nr_components = model.n_components
         nr_observations = len(x)
         negative_bic = 2 * log_likelihood - nr_components * math.log(nr_observations)
@@ -165,13 +171,12 @@ class SelectorCV(ModelSelectorUsingCV):
     ''' select best model based on average log Likelihood of cross-validation folds
     '''
 
-    def score(self, model, x, x_lengths):
-        '''
-        Generates the score for a given model using the observations x
-        :param model: the model being scored
-        :param x: observations to be scored by the model (contains several X (words))
-        :param x_lengths: length of each X (word) in observations
-        :return: calculated score. The model with highest score is the best.
-        '''
-        log_likelihood = model.score(x, x_lengths)
+    def score(self, model, x):
+        """
+       Generates the score for a given model using the observations x
+       :param model: the model being scored
+       :param x: observation X to be scored by the model
+       :return: calculated score. The model with highest score is the best.
+       """
+        log_likelihood = model.score(x, [len(x)])
         return log_likelihood
