@@ -169,23 +169,19 @@ class SelectorDIC(ModelSelectorUsingCV):
     '''
 
     def scoreModelWithFold(self, model, sequences):
-        return [self.score(model, test_x) for test_x in sequences]
+        words = self.words.keys()
+        other_words = [k for k in words if k != self.this_word]
 
-    def score(self, model, x):
-        """
-       Generates the score for a given model using the observations x
-       :param model: the model being scored
-       :param x: observation X to be scored by the model
-       :return: calculated score. The model with highest score is the best.
-       """
-        log_likelihood_x = self.score_safely(model, x, [len(x)])
+        other_log_likelihoods = list(
+            map(lambda w: statistics.mean(map(lambda o: self.score_safely(model, o, [len(o)]), self.words[w])),
+                other_words))
 
-        # other_classes =
+        other_likelihood = 1 / (len(words) - 1) * sum(other_log_likelihoods)
 
-        sum_log_likelihood_others = 1
-        M = len(self.hwords.keys())  # the number of classes (nr of total words)
+        def score_sequence(sequence):
+            return self.score_safely(model, sequence, [len(sequence)]) - other_likelihood
 
-        return log_likelihood_x
+        return map(score_sequence, sequences)
 
 
 class SelectorCV(ModelSelectorUsingCV):
