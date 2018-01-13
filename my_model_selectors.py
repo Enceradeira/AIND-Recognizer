@@ -128,8 +128,8 @@ class ModelSelectorUsingCV(ModelSelector, ABC):
         """
         Scores the given model with the given test-fold
         :param model: the model to be scored
-        :sequences: sequences against which the model is to be scored
-        :return: the score whereas a higher score indicates a better model
+        :sequences: sequences with which the model is to be scored
+        :return: the score per sequence whereas a higher score indicates a better model
         """
         pass
 
@@ -142,20 +142,21 @@ class SelectorBIC(ModelSelectorUsingCV):
     """
 
     def scoreModelWithFold(self, model, sequences):
-        return [self.score(model, test_x) for test_x in sequences]
-
-    def score(self, model, x):
         """
-       Generates the score for a given model using the observations x
-       :param model: the model being scored
-       :param x: observation X to be scored by the model
-       :return: calculated score. The model with highest score is the best.
-       """
-        log_likelihood = self.score_safely(model, x, [len(x)])
-        nr_components = model.n_components
-        nr_observations = len(x)
-        negative_bic = 2 * log_likelihood - nr_components * math.log(nr_observations)
-        return negative_bic  # a negative bic is returned because max score is considered best
+        Scores the given model with the given test-fold
+        :param model: the model to be scored
+        :sequences: sequences with which the model is to be scored
+        :return: the score per sequence whereas a higher score indicates a better model
+        """
+
+        def score(x):
+            log_likelihood = self.score_safely(model, x, [len(x)])
+            nr_components = model.n_components
+            nr_observations = len(x)
+            negative_bic = 2 * log_likelihood - nr_components * math.log(nr_observations)
+            return negative_bic  # a negative bic is returned because max score is considered best
+
+        return map(score, sequences)
 
 
 class SelectorDIC(ModelSelectorUsingCV):
@@ -169,6 +170,12 @@ class SelectorDIC(ModelSelectorUsingCV):
     '''
 
     def scoreModelWithFold(self, model, sequences):
+        """
+       Scores the given model with the given test-fold
+       :param model: the model to be scored
+       :sequences: sequences with which the model is to be scored
+       :return: the score per sequence whereas a higher score indicates a better model
+       """
         words = self.words.keys()
         other_words = [k for k in words if k != self.this_word]
 
@@ -189,14 +196,14 @@ class SelectorCV(ModelSelectorUsingCV):
     '''
 
     def scoreModelWithFold(self, model, sequences):
-        return [self.score(model, test_x) for test_x in sequences]
-
-    def score(self, model, x):
         """
-       Generates the score for a given model using the observations x
-       :param model: the model being scored
-       :param x: observation X to be scored by the model
-       :return: calculated score. The model with highest score is the best.
-       """
-        log_likelihood = self.score_safely(model, x, [len(x)])
-        return log_likelihood
+        Scores the given model with the given test-fold
+        :param model: the model to be scored
+        :sequences: sequences with which the model is to be scored
+        :return: the score per sequence whereas a higher score indicates a better model
+        """
+
+        def score(x):
+            return self.score_safely(model, x, [len(x)])
+
+        return map(score, sequences)
