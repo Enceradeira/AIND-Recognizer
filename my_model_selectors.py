@@ -111,20 +111,15 @@ class ModelSelectorUsingCV(ModelSelector, ABC):
             yield -math.inf
         else:
             # score using 'test part' of test-set
-            for test_x in self.iterate_sequences(test_indices):
-                try:
-                    yield self.score(model, test_x)
-                except ValueError:
-                    # invalid model
-                    yield -math.inf
+            yield from self.scoreModelWithFold(model, self.iterate_sequences(test_indices))
 
     @abstractmethod
-    def score(self, model, x):
+    def scoreModelWithFold(self, model, sequences):
         """
-        Generates the score for a given model using the observations x
-        :param model: the model being scored
-        :param x: observation X to be scored by the model
-        :return: calculated score. The model with highest score is the best.
+        Scores the given model with the given test-fold
+        :param model: the model to be scored
+        :sequences: sequences against which the model is to be scored
+        :return: the score whereas a higher score indicates a better model
         """
         pass
 
@@ -135,6 +130,13 @@ class SelectorBIC(ModelSelectorUsingCV):
     http://www2.imm.dtu.dk/courses/02433/doc/ch6_slides.pdf
     Bayesian information criteria: BIC = -2 * logL + p * logN
     """
+    def scoreModelWithFold(self, model, sequences):
+        for test_x in sequences:
+            try:
+                yield self.score(model, test_x)
+            except ValueError:
+                # invalid model
+                yield -math.inf
 
     def score(self, model, x):
         """
@@ -150,7 +152,7 @@ class SelectorBIC(ModelSelectorUsingCV):
         return negative_bic  # a negative bic is returned because max score is considered best
 
 
-class SelectorDIC(ModelSelector):
+class SelectorDIC(ModelSelectorUsingCV):
     ''' select best model based on Discriminative Information Criterion
 
     Biem, Alain. "A model selection criterion for classification: Application to hmm topology optimization."
@@ -159,17 +161,42 @@ class SelectorDIC(ModelSelector):
     https://pdfs.semanticscholar.org/ed3d/7c4a5f607201f3848d4c02dd9ba17c791fc2.pdf
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
     '''
+    def scoreModelWithFold(self, model, sequences):
+        for test_x in sequences:
+            try:
+                yield self.score(model, test_x)
+            except ValueError:
+                # invalid model
+                yield -math.inf
 
-    def select(self):
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
+    def score(self, model, x):
+        """
+       Generates the score for a given model using the observations x
+       :param model: the model being scored
+       :param x: observation X to be scored by the model
+       :return: calculated score. The model with highest score is the best.
+       """
+        log_likelihood_x = model.score(x, [len(x)])
 
-        # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        #other_classes =
+
+        sum_log_likelihood_others = 1
+        M = len(self.hwords.keys()) # the number of classes (nr of total words)
+
+        return log_likelihood_x
 
 
 class SelectorCV(ModelSelectorUsingCV):
     ''' select best model based on average log Likelihood of cross-validation folds
     '''
+
+    def scoreModelWithFold(self, model, sequences):
+        for test_x in sequences:
+            try:
+                yield self.score(model, test_x)
+            except ValueError:
+                # invalid model
+                yield -math.inf
 
     def score(self, model, x):
         """
