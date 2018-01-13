@@ -149,14 +149,14 @@ class SelectorBIC(ModelSelectorUsingCV):
         :return: the score per sequence whereas a higher score indicates a better model
         """
 
-        def score(x):
+        def calculate_bic(x):
             log_likelihood = self.score_safely(model, x, [len(x)])
             nr_components = model.n_components
             nr_observations = len(x)
             negative_bic = 2 * log_likelihood - nr_components * math.log(nr_observations)
             return negative_bic  # a negative bic is returned because max score is considered best
 
-        return map(score, sequences)
+        return map(calculate_bic, sequences)
 
 
 class SelectorDIC(ModelSelectorUsingCV):
@@ -179,16 +179,20 @@ class SelectorDIC(ModelSelectorUsingCV):
         words = self.words.keys()
         other_words = [k for k in words if k != self.this_word]
 
-        other_log_likelihoods = list(
-            map(lambda w: statistics.mean(map(lambda o: self.score_safely(model, o, [len(o)]), self.words[w])),
-                other_words))
+        def calculate_likelihood_of_sequence(sequence):
+            return self.score_safely(model, sequence, [len(sequence)])
 
-        other_likelihood = 1 / (len(words) - 1) * sum(other_log_likelihoods)
+        def calculate_likelihood_of_word(w):
+            sequences_of_word = self.words[w]
+            return statistics.mean(map(calculate_likelihood_of_sequence, sequences_of_word))
 
-        def score_sequence(sequence):
-            return self.score_safely(model, sequence, [len(sequence)]) - other_likelihood
+        def calculate_dic(sequence):
+            return self.score_safely(model, sequence, [len(sequence)]) - other_log_likelihood
 
-        return map(score_sequence, sequences)
+        other_log_likelihoods = map(calculate_likelihood_of_word, other_words)
+        other_log_likelihood = 1 / (len(words) - 1) * sum(other_log_likelihoods)
+
+        return map(calculate_dic, sequences)
 
 
 class SelectorCV(ModelSelectorUsingCV):
@@ -203,7 +207,7 @@ class SelectorCV(ModelSelectorUsingCV):
         :return: the score per sequence whereas a higher score indicates a better model
         """
 
-        def score(x):
+        def calculate_log_likelihood(x):
             return self.score_safely(model, x, [len(x)])
 
-        return map(score, sequences)
+        return map(calculate_log_likelihood, sequences)
