@@ -70,6 +70,16 @@ class ModelSelectorUsingCV(ModelSelector, ABC):
 
     '''
 
+    def score_safely(self, model, x, x_lengths):
+        """
+        return a score for the model or -inf if model invalid
+        """
+        try:
+            return model.score(x, x_lengths)
+        except ValueError:
+            # invalid model
+            return -math.inf
+
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -108,10 +118,10 @@ class ModelSelectorUsingCV(ModelSelector, ABC):
         training_x, training_lengths = self.split_sequences(train_indices)
         model = self.create_and_fit_model(nr_components, training_x, training_lengths)
         if not model:
-            yield -math.inf
+            return [-math.inf]
         else:
             # score using 'test part' of test-set
-            yield from self.scoreModelWithFold(model, self.iterate_sequences(test_indices))
+            return self.scoreModelWithFold(model, self.iterate_sequences(test_indices))
 
     @abstractmethod
     def scoreModelWithFold(self, model, sequences):
@@ -130,13 +140,9 @@ class SelectorBIC(ModelSelectorUsingCV):
     http://www2.imm.dtu.dk/courses/02433/doc/ch6_slides.pdf
     Bayesian information criteria: BIC = -2 * logL + p * logN
     """
+
     def scoreModelWithFold(self, model, sequences):
-        for test_x in sequences:
-            try:
-                yield self.score(model, test_x)
-            except ValueError:
-                # invalid model
-                yield -math.inf
+        return [self.score(model, test_x) for test_x in sequences]
 
     def score(self, model, x):
         """
@@ -145,7 +151,7 @@ class SelectorBIC(ModelSelectorUsingCV):
        :param x: observation X to be scored by the model
        :return: calculated score. The model with highest score is the best.
        """
-        log_likelihood = model.score(x, [len(x)])
+        log_likelihood = self.score_safely(model, x, [len(x)])
         nr_components = model.n_components
         nr_observations = len(x)
         negative_bic = 2 * log_likelihood - nr_components * math.log(nr_observations)
@@ -161,13 +167,9 @@ class SelectorDIC(ModelSelectorUsingCV):
     https://pdfs.semanticscholar.org/ed3d/7c4a5f607201f3848d4c02dd9ba17c791fc2.pdf
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
     '''
+
     def scoreModelWithFold(self, model, sequences):
-        for test_x in sequences:
-            try:
-                yield self.score(model, test_x)
-            except ValueError:
-                # invalid model
-                yield -math.inf
+        return [self.score(model, test_x) for test_x in sequences]
 
     def score(self, model, x):
         """
@@ -176,12 +178,12 @@ class SelectorDIC(ModelSelectorUsingCV):
        :param x: observation X to be scored by the model
        :return: calculated score. The model with highest score is the best.
        """
-        log_likelihood_x = model.score(x, [len(x)])
+        log_likelihood_x = self.score_safely(model, x, [len(x)])
 
-        #other_classes =
+        # other_classes =
 
         sum_log_likelihood_others = 1
-        M = len(self.hwords.keys()) # the number of classes (nr of total words)
+        M = len(self.hwords.keys())  # the number of classes (nr of total words)
 
         return log_likelihood_x
 
@@ -191,12 +193,7 @@ class SelectorCV(ModelSelectorUsingCV):
     '''
 
     def scoreModelWithFold(self, model, sequences):
-        for test_x in sequences:
-            try:
-                yield self.score(model, test_x)
-            except ValueError:
-                # invalid model
-                yield -math.inf
+        return [self.score(model, test_x) for test_x in sequences]
 
     def score(self, model, x):
         """
@@ -205,5 +202,5 @@ class SelectorCV(ModelSelectorUsingCV):
        :param x: observation X to be scored by the model
        :return: calculated score. The model with highest score is the best.
        """
-        log_likelihood = model.score(x, [len(x)])
+        log_likelihood = self.score_safely(model, x, [len(x)])
         return log_likelihood
