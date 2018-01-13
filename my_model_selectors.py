@@ -64,6 +64,7 @@ class SelectorConstant(ModelSelector):
         best_num_components = self.n_constant
         return self.base_model(best_num_components)
 
+
 class ModelSelectorUsingCV(ModelSelector, ABC):
     ''' selects best model by cross-validating folds that are based on given word sequences
 
@@ -104,21 +105,22 @@ class ModelSelectorUsingCV(ModelSelector, ABC):
         # score using 'test part' of test-set
         test_x, test_lengths = split_sequences(test_indices)
         try:
-            return self.score(model.score(test_x, test_lengths), nr_components, len(test_x))
+            return self.score(model, test_x, test_lengths)
         except ValueError:
             # invalid model
             return -math.inf
 
     @abstractmethod
-    def score(self, log_likelihood, nr_components, nr_observations):
+    def score(self, model, x, x_lengths):
         '''
-        Generates the score based upon an evaluated test word
-        :param log_likelihood: the log-likelihood for the test word
-        :param nr_components: the nr components of the trained hmm
-        :param nr_observations: the nr observations for the test word
-        :return:
+        Generates the score for a given model using the observations x
+        :param model: the model being scored
+        :param x: observations to be scored by the model (contains several X (words))
+        :param x_lengths: length of each X (word) in observations
+        :return: calculated score. The model with highest score is the best.
         '''
         pass
+
 
 class SelectorBIC(ModelSelectorUsingCV):
     """ select the model with the lowest Bayesian Information Criterion(BIC) score
@@ -127,11 +129,19 @@ class SelectorBIC(ModelSelectorUsingCV):
     Bayesian information criteria: BIC = -2 * logL + p * logN
     """
 
-    def score(self, log_likelihood, nr_components, nr_observations):
-        ''' Generates the score based on the log likelihood
+    def score(self, model, x, x_lengths):
         '''
+        Generates the score for a given model using the observations x
+        :param model: the model being scored
+        :param x: observations to be scored by the model (contains several X (words))
+        :param x_lengths: length of each X (word) in observations
+        :return: calculated score. The model with highest score is the best.
+        '''
+        log_likelihood = model.score(x, x_lengths)
+        nr_components = model.n_components
+        nr_observations = len(x)
         negative_bic = 2 * log_likelihood - nr_components * math.log(nr_observations)
-        return negative_bic # a negative bis is returned because max score is considered best
+        return negative_bic  # a negative bic is returned because max score is considered best
 
 
 class SelectorDIC(ModelSelector):
@@ -154,7 +164,14 @@ class SelectorDIC(ModelSelector):
 class SelectorCV(ModelSelectorUsingCV):
     ''' select best model based on average log Likelihood of cross-validation folds
     '''
-    def score(self, log_likelihood, nr_components, nr_observations):
-        ''' Generates the score based on the log likelihood
+
+    def score(self, model, x, x_lengths):
         '''
+        Generates the score for a given model using the observations x
+        :param model: the model being scored
+        :param x: observations to be scored by the model (contains several X (words))
+        :param x_lengths: length of each X (word) in observations
+        :return: calculated score. The model with highest score is the best.
+        '''
+        log_likelihood = model.score(x, x_lengths)
         return log_likelihood
