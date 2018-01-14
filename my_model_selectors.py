@@ -187,7 +187,7 @@ class SelectorBIC(ModelSelectorUsingTrials):
         return negative_bic
 
 
-class SelectorDIC(ModelSelectorUsingCV):
+class SelectorDIC(ModelSelectorUsingTrials):
     ''' select best model based on Discriminative Information Criterion
 
     Biem, Alain. "A model selection criterion for classification: Application to hmm topology optimization."
@@ -197,30 +197,25 @@ class SelectorDIC(ModelSelectorUsingCV):
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
     '''
 
-    def scoreModelWithFold(self, model, sequences):
+    def scoreTrial(self, nr_components):
         """
-       Scores the given model with the given test-fold
-       :param model: the model to be scored
-       :sequences: sequences with which the model is to be scored
-       :return: the score per sequence whereas a higher score indicates a better model
-       """
+        calculates a score for a model with the given number of components
+        :param nr_components: nr of components for the model to be tested
+        :return: the score. A higher score is better, -inf if model is invalid
+        """
         words = self.words.keys()
         other_words = [k for k in words if k != self.this_word]
 
-        def calculate_likelihood_of_sequence(sequence):
-            return self.score_safely(model, sequence, [len(sequence)])
+        model = self.create_and_fit_model(nr_components, self.X, self.lengths)
+        log_likelihoods = self.score_safely(model, self.X, self.lengths)
 
         def calculate_likelihood_of_word(w):
-            sequences_of_word = self.words[w]
-            return statistics.mean(map(calculate_likelihood_of_sequence, sequences_of_word))
+            x, x_lengths = self.hwords[w]
+            return self.score_safely(model,x,x_lengths)
 
-        def calculate_dic(sequence):
-            return self.score_safely(model, sequence, [len(sequence)]) - other_log_likelihood
+        other_log_likelihood = 1 / (len(words) - 1) * sum(map(calculate_likelihood_of_word, other_words))
 
-        other_log_likelihoods = map(calculate_likelihood_of_word, other_words)
-        other_log_likelihood = 1 / (len(words) - 1) * sum(other_log_likelihoods)
-
-        return map(calculate_dic, sequences)
+        return log_likelihoods - other_log_likelihood
 
 
 class SelectorCV(ModelSelectorUsingCV):
