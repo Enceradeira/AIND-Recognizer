@@ -50,6 +50,16 @@ class ModelSelector(object):
                 print("failure on {} with {} states".format(self.this_word, num_states))
             return None
 
+    def score_safely(self, model, x, x_lengths):
+        """
+        return a score for the model or -inf if model invalid
+        """
+        try:
+            return model.score(x, x_lengths)
+        except ValueError:
+            # invalid model
+            return -math.inf
+
 
 class SelectorConstant(ModelSelector):
     """ select the model with value self.n_constant
@@ -65,28 +75,34 @@ class SelectorConstant(ModelSelector):
         return self.base_model(best_num_components)
 
 
-class ModelSelectorUsingCV(ModelSelector, ABC):
-    ''' selects best model by cross-validating folds that are based on given word sequences
-
-    '''
-
-    def score_safely(self, model, x, x_lengths):
-        """
-        return a score for the model or -inf if model invalid
-        """
-        try:
-            return model.score(x, x_lengths)
-        except ValueError:
-            # invalid model
-            return -math.inf
+class ModelSelectorUsingTrials(ModelSelector, ABC):
+    """
+    A selector that iteratively tests models and selects the one with
+    best score
+    """
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
         trials = range(self.min_n_components, self.max_n_components)
-        models_and_scores = list(map(self.scoreTrial, trials))
+        models_and_scores = list(map(lambda nr: (nr, self.scoreTrial(nr)), trials))
         best_model_and_score = max(models_and_scores, key=lambda ms: ms[1])
         return self.base_model(best_model_and_score[0])
+
+    @abstractmethod
+    def scoreTrial(self, nr_components):
+        """
+        calculates a score for a model with the given number of components
+        :param nr_components: nr of components for the model to be tested
+        :return: the score. A higher score is better, -inf if model is invalid
+        """
+        pass
+
+
+class ModelSelectorUsingCV(ModelSelectorUsingTrials, ABC):
+    ''' selects best model by cross-validating folds that are based on given word sequences
+
+    '''
 
     def split_sequences(self, indices):
         training_sequences = [self.sequences[i] for i in indices]
@@ -108,7 +124,7 @@ class ModelSelectorUsingCV(ModelSelector, ABC):
         # the mean of all cross-validation folds for the scored nr_components
         scores = list(map(lambda split: self.scoreTrialWithFold(split, nr_components), splits))
         flattened_scores = [val for sublist in scores for val in sublist]
-        return nr_components, statistics.mean(flattened_scores)
+        return statistics.mean(flattened_scores)
 
     def scoreTrialWithFold(self, fold_split, nr_components):
         train_indices = fold_split[0]
@@ -134,29 +150,41 @@ class ModelSelectorUsingCV(ModelSelector, ABC):
         pass
 
 
-class SelectorBIC(ModelSelectorUsingCV):
+class SelectorBIC(ModelSelectorUsingTrials):
     """ select the model with the lowest Bayesian Information Criterion(BIC) score
 
     http://www2.imm.dtu.dk/courses/02433/doc/ch6_slides.pdf
     Bayesian information criteria: BIC = -2 * logL + p * logN
     """
 
-    def scoreModelWithFold(self, model, sequences):
+    def scoreTrial(self, nr_components):
         """
-        Scores the given model with the given test-fold
-        :param model: the model to be scored
-        :sequences: sequences with which the model is to be scored
-        :return: the score per sequence whereas a higher score indicates a better model
+        calculates a score for a model with the given number of components
+        :param nr_components: nr of components for the model to be tested
+        :return: a score, a higher score is better, -inf if model is invalid
         """
 
-        def calculate_bic(x):
-            log_likelihood = self.score_safely(model, x, [len(x)])
-            nr_components = model.n_components
-            nr_observations = len(x)
-            negative_bic = 2 * log_likelihood - nr_components * math.log(nr_observations)
-            return negative_bic  # a negative bic is returned because max score is considered best
+        model = self.create_and_fit_model(nr_components, self.X, self.lengths)
 
-        return map(calculate_bic, sequences)
+        log_likelihood = self.score_safely(model, self.X, self.lengths)
+        assert model.covariance_type == "diag", "following calculation holds just for 'diag'"
+
+        # Following formula is minus 1 because one transition probability can be calculated by
+        # subtracting others from total probability which is 1
+        nr_transition_params = model.n_components * (model.n_components - 1)
+
+        # Per component (state) there is the output distribution per feature. The formula is minus
+        # 1 because one feature output probability can be calculated by subtracting others
+        # from total output probability which is 1
+        nr_output_params = model.n_components * (model.n_features - 1)
+
+        nr_params = nr_transition_params + nr_output_params
+
+        nr_data_points = len(self.X)
+
+        # calculate bic negative because best score is highest by definition
+        negative_bic = 2 * log_likelihood - nr_params * math.log(nr_data_points)
+        return negative_bic
 
 
 class SelectorDIC(ModelSelectorUsingCV):
