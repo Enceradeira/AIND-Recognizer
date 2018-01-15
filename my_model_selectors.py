@@ -50,12 +50,13 @@ class ModelSelector(object):
                 print("failure on {} with {} states".format(self.this_word, num_states))
             return None
 
-    def score_safely(self, model, x, x_lengths):
+    def calculate_mean_score(self, model, x, x_lengths):
         """
         return a score for the model or -inf if model invalid
         """
         try:
-            return model.score(x, x_lengths)
+            # build mean, as score seems to return the joint probability over all x's
+            return model.score(x, x_lengths) / len(x_lengths)
         except ValueError:
             # invalid model
             return -math.inf
@@ -114,7 +115,7 @@ class SelectorBIC(ModelSelectorUsingTrials):
 
         model = self.create_and_fit_model(nr_components, self.X, self.lengths)
 
-        log_likelihood = self.score_safely(model, self.X, self.lengths)
+        log_likelihood = self.calculate_mean_score(model, self.X, self.lengths)
         assert model.covariance_type == "diag", "following calculation holds just for 'diag'"
 
         # Following formula is minus 1 because one transition probability can be calculated by
@@ -155,11 +156,11 @@ class SelectorDIC(ModelSelectorUsingTrials):
         other_words = [k for k in words if k != self.this_word]
 
         model = self.create_and_fit_model(nr_components, self.X, self.lengths)
-        log_likelihoods = self.score_safely(model, self.X, self.lengths)
+        log_likelihoods = self.calculate_mean_score(model, self.X, self.lengths)
 
         def calculate_likelihood_of_word(w):
             x, x_lengths = self.hwords[w]
-            return self.score_safely(model,x,x_lengths)
+            return self.calculate_mean_score(model, x, x_lengths)
 
         other_log_likelihood = 1 / (len(words) - 1) * sum(map(calculate_likelihood_of_word, other_words))
 
@@ -202,6 +203,6 @@ class SelectorCV(ModelSelectorUsingTrials):
         else:
             # score using 'test part' of test-set
             test_x, test_lengths = self.split_sequences(test_indices)
-            return self.score_safely(model, test_x, test_lengths)
+            return self.calculate_mean_score(model, test_x, test_lengths)
 
 
