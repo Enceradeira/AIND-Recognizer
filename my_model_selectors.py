@@ -98,58 +98,6 @@ class ModelSelectorUsingTrials(ModelSelector, ABC):
         """
         pass
 
-
-class ModelSelectorUsingCV(ModelSelectorUsingTrials, ABC):
-    ''' selects best model by cross-validating folds that are based on given word sequences
-
-    '''
-
-    def split_sequences(self, indices):
-        training_sequences = [self.sequences[i] for i in indices]
-        training_x = [evt for sequence in training_sequences for evt in sequence]
-        training_lengths = [len(sequence) for sequence in training_sequences]
-        return training_x, training_lengths
-
-    def iterate_sequences(self, indices):
-        sequence, lengths = self.split_sequences(indices)
-        begin = 0
-        for length in lengths:
-            yield sequence[begin:begin + length]
-            begin = begin + length
-
-    def scoreTrial(self, nr_components):
-        nr_cross_validation_sets = min(3, len(self.sequences))
-        splits = KFold(n_splits=nr_cross_validation_sets).split(self.sequences)
-
-        # the mean of all cross-validation folds for the scored nr_components
-        scores = list(map(lambda split: self.scoreTrialWithFold(split, nr_components), splits))
-        flattened_scores = [val for sublist in scores for val in sublist]
-        return statistics.mean(flattened_scores)
-
-    def scoreTrialWithFold(self, fold_split, nr_components):
-        train_indices = fold_split[0]
-        test_indices = fold_split[1]
-
-        # training using 'training part' of test-set
-        training_x, training_lengths = self.split_sequences(train_indices)
-        model = self.create_and_fit_model(nr_components, training_x, training_lengths)
-        if not model:
-            return [-math.inf]
-        else:
-            # score using 'test part' of test-set
-            return self.scoreModelWithFold(model, self.iterate_sequences(test_indices))
-
-    @abstractmethod
-    def scoreModelWithFold(self, model, sequences):
-        """
-        Scores the given model with the given test-fold
-        :param model: the model to be scored
-        :sequences: sequences with which the model is to be scored
-        :return: the score per sequence whereas a higher score indicates a better model
-        """
-        pass
-
-
 class SelectorBIC(ModelSelectorUsingTrials):
     """ select the model with the lowest Bayesian Information Criterion(BIC) score
 
@@ -218,19 +166,42 @@ class SelectorDIC(ModelSelectorUsingTrials):
         return log_likelihoods - other_log_likelihood
 
 
-class SelectorCV(ModelSelectorUsingCV):
+class SelectorCV(ModelSelectorUsingTrials):
     ''' select best model based on average log Likelihood of cross-validation folds
     '''
+    def split_sequences(self, indices):
+        training_sequences = [self.sequences[i] for i in indices]
+        training_x = [evt for sequence in training_sequences for evt in sequence]
+        training_lengths = [len(sequence) for sequence in training_sequences]
+        return training_x, training_lengths
 
-    def scoreModelWithFold(self, model, sequences):
-        """
-        Scores the given model with the given test-fold
-        :param model: the model to be scored
-        :sequences: sequences with which the model is to be scored
-        :return: the score per sequence whereas a higher score indicates a better model
-        """
+    def iterate_sequences(self, indices):
+        sequence, lengths = self.split_sequences(indices)
+        begin = 0
+        for length in lengths:
+            yield sequence[begin:begin + length]
+            begin = begin + length
 
-        def calculate_log_likelihood(x):
-            return self.score_safely(model, x, [len(x)])
+    def scoreTrial(self, nr_components):
+        nr_cross_validation_sets = min(3, len(self.sequences))
+        splits = KFold(n_splits=nr_cross_validation_sets).split(self.sequences)
 
-        return map(calculate_log_likelihood, sequences)
+        # the mean of all cross-validation folds for the scored nr_components
+        scores = list(map(lambda split: self.scoreTrialWithFold(split, nr_components), splits))
+        return statistics.mean(scores)
+
+    def scoreTrialWithFold(self, fold_split, nr_components):
+        train_indices = fold_split[0]
+        test_indices = fold_split[1]
+
+        # training using 'training part' of test-set
+        training_x, training_lengths = self.split_sequences(train_indices)
+        model = self.create_and_fit_model(nr_components, training_x, training_lengths)
+        if not model:
+            return -math.inf
+        else:
+            # score using 'test part' of test-set
+            test_x, test_lengths = self.split_sequences(test_indices)
+            return self.score_safely(model, test_x, test_lengths)
+
+
