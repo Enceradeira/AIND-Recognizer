@@ -190,7 +190,10 @@ class SelectorCV(ModelSelectorUsingTrials):
 
     def scoreTrial(self, nr_components):
         nr_cross_validation_sets = min(3, len(self.sequences))
-        splits = KFold(n_splits=nr_cross_validation_sets).split(self.sequences)
+        if nr_cross_validation_sets == 1:
+            splits = [[[0],[0]]]
+        else:
+            splits = KFold(n_splits=nr_cross_validation_sets).split(self.sequences)
 
         # the mean of all cross-validation folds for the scored nr_components
         scores = list(map(lambda split: self.scoreTrialWithFold(split, nr_components), splits))
