@@ -114,6 +114,8 @@ class SelectorBIC(ModelSelectorUsingTrials):
         """
 
         model = self.create_and_fit_model(nr_components, self.X, self.lengths)
+        if not model:
+            return -math.inf
 
         log_likelihood = self.calculate_mean_score(model, self.X, self.lengths)
         assert model.covariance_type == "diag", "following calculation holds just for 'diag'"
@@ -156,6 +158,9 @@ class SelectorDIC(ModelSelectorUsingTrials):
         other_words = [k for k in words if k != self.this_word]
 
         model = self.create_and_fit_model(nr_components, self.X, self.lengths)
+        if not model:
+            return -math.inf
+
         log_likelihoods = self.calculate_mean_score(model, self.X, self.lengths)
 
         def calculate_likelihood_of_word(w):
