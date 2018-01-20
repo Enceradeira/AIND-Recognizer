@@ -17,22 +17,6 @@ asl.df['grnd-rx'] = asl.df['right-x'] - asl.df['nose-x']
 asl.df['grnd-ly'] = asl.df['left-y'] - asl.df['nose-y']
 asl.df['grnd-lx'] = asl.df['left-x'] - asl.df['nose-x']
 
-### Norm Features
-features_norm = ['norm-rx', 'norm-ry', 'norm-lx', 'norm-ly']
-df_means = asl.df.groupby('speaker').mean()
-df_std = asl.df.groupby('speaker').std()
-
-
-def calculate_norm(coordinate):
-    speaker = asl.df['speaker']
-    return (asl.df[coordinate] - (speaker.map(df_means[coordinate]))) / (speaker.map(df_std[coordinate]))
-
-
-asl.df[features_norm[0]] = calculate_norm('right-x')
-asl.df[features_norm[1]] = calculate_norm('right-y')
-asl.df[features_norm[2]] = calculate_norm('left-x')
-asl.df[features_norm[3]] = calculate_norm('left-y')
-
 ### Polar Features
 features_polar = ['polar-rr', 'polar-rtheta', 'polar-lr', 'polar-ltheta']
 
@@ -62,6 +46,35 @@ asl.df[features_delta[0]] = calculate_diff('right-x')
 asl.df[features_delta[1]] = calculate_diff('right-y')
 asl.df[features_delta[2]] = calculate_diff('left-x')
 asl.df[features_delta[3]] = calculate_diff('left-y')
+
+### Norm Features
+features_norm = ['norm-rx', 'norm-ry', 'norm-lx', 'norm-ly']
+df_means = asl.df.groupby('speaker').mean()
+df_std = asl.df.groupby('speaker').std()
+
+
+def calculate_norm(coordinate):
+    speaker = asl.df['speaker']
+    return (asl.df[coordinate] - (speaker.map(df_means[coordinate]))) / (speaker.map(df_std[coordinate]))
+
+
+asl.df[features_norm[0]] = calculate_norm('right-x')
+asl.df[features_norm[1]] = calculate_norm('right-y')
+asl.df[features_norm[2]] = calculate_norm('left-x')
+asl.df[features_norm[3]] = calculate_norm('left-y')
+
+
+## Ground Norm-Feature
+features_ground_norm = ['grnd-norm-rx', 'grnd-norm-ry', 'grnd-norm-lx', 'grnd-norm-ly']
+asl.df[features_ground_norm[0]] = calculate_norm(features_ground[0])
+asl.df[features_ground_norm[1]] = calculate_norm(features_ground[1])
+asl.df[features_ground_norm[2]] = calculate_norm(features_ground[2])
+asl.df[features_ground_norm[3]] = calculate_norm(features_ground[3])
+
+## Polar Norm-Feature
+features_polar_norm = ['polar-norm-rr', features_polar[1], 'polar-norm-lr', features_polar[3]]
+asl.df[features_polar_norm[0]] = calculate_norm(features_polar[0])
+asl.df[features_polar_norm[2]] = calculate_norm(features_polar[2])
 
 
 def calculate_error_rate(guesses: list, test_set: SinglesData):
@@ -117,7 +130,7 @@ def print_to_grid(results):
     [print(f"{result[0][0]}\t|\t{result[1][0]}\t|\t{result[2]}") for result in results]
 
 selectors = {"cv": SelectorCV, "bic": SelectorBIC, "dic": SelectorDIC}
-features = {"ground": features_ground, "norm": features_norm, "delta": features_delta, "polar": features_polar}
+features = {"ground": features_ground, "norm": features_norm, "delta": features_delta, "polar": features_polar, "grnd-norm": features_ground_norm, "polar-norm": features_polar_norm}
 nr_runs = len(selectors) * len(features)
 
 combinations = [(s, f) for s in selectors.items() for f in features.items()]
