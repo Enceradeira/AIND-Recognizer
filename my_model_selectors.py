@@ -189,6 +189,11 @@ class SelectorCV(ModelSelectorUsingTrials):
             begin = begin + length
 
     def scoreTrial(self, nr_components):
+        """
+           calculates a score for a model with the given number of components
+           :param nr_components: nr of components for the model to be tested
+           :return: the score. A higher score is better, -inf if model is invalid
+        """
         nr_cross_validation_sets = min(3, len(self.sequences))
         if nr_cross_validation_sets == 1:
             splits = [[[0],[0]]]
