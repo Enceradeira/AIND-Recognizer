@@ -36,18 +36,18 @@
 # 
 # To start, let's set up the initial database and select an example set of features for the training set.  At the end of Part 1, you will create additional feature sets for experimentation. 
 
-# In[2]:
+# In[72]:
 
 import numpy as np
 import pandas as pd
 from asl_data import AslDb
-
+from matplotlib import (cm, pyplot as plt, mlab)
 
 asl = AslDb() # initializes the database
 asl.df.head() # displays the first five rows of the asl database, indexed by video and frame
 
 
-# In[3]:
+# In[73]:
 
 asl.df.ix[98,1]  # look at the data available for an individual frame
 
@@ -58,7 +58,7 @@ asl.df.ix[98,1]  # look at the data available for an individual frame
 # ##### Feature selection for training the model
 # The objective of feature selection when training a model is to choose the most relevant variables while keeping the model as simple as possible, thus reducing training time.  We can use the raw features already provided or derive our own and add columns to the pandas dataframe `asl.df` for selection. As an example, in the next cell a feature named `'grnd-ry'` is added. This feature is the difference between the right-hand y value and the nose y value, which serves as the "ground" right y value. 
 
-# In[4]:
+# In[74]:
 
 asl.df['grnd-ry'] = asl.df['right-y'] - asl.df['nose-y']
 asl.df.head()  # the new feature 'grnd-ry' is now in the frames dictionary
@@ -66,7 +66,7 @@ asl.df.head()  # the new feature 'grnd-ry' is now in the frames dictionary
 
 # ##### Try it!
 
-# In[5]:
+# In[75]:
 
 from asl_utils import test_features_tryit
 # TODO add df columns for 'grnd-rx', 'grnd-ly', 'grnd-lx' representing differences between hand and nose locations
@@ -79,7 +79,7 @@ asl.df['grnd-lx'] = asl.df['left-x'] - asl.df['nose-x']
 test_features_tryit(asl)
 
 
-# In[6]:
+# In[76]:
 
 # collect the features into a list
 features_ground = ['grnd-rx','grnd-ry','grnd-lx','grnd-ly']
@@ -90,19 +90,14 @@ features_ground = ['grnd-rx','grnd-ry','grnd-lx','grnd-ly']
 # ##### Build the training set
 # Now that we have a feature list defined, we can pass that list to the `build_training` method to collect the features for all the words in the training set.  Each word in the training set has multiple examples from various videos.  Below we can see the unique words that have been loaded into the training set:
 
-# In[7]:
-
-
-# The training data in `training` is an object of class `WordsData` defined in the `asl_data` module.  in addition to the `words` list, data can be accessed with the `get_all_sequences`, `get_all_Xlengths`, `get_word_sequences`, and `get_word_Xlengths` methods. We need the `get_word_Xlengths` method to train multiple sequences with the `hmmlearn` library.  In the following example, notice that there are two lists; the first is a concatenation of all the sequences(the X portion) and the second is a list of the sequence lengths(the Lengths portion).
-
-# In[8]:
+# In[77]:
 
 
 
 # ###### More feature sets
 # So far we have a simple feature set that is enough to get started modeling.  However, we might get better results if we manipulate the raw values a bit more, so we will go ahead and set up some other options now for experimentation later.  For example, we could normalize each speaker's range of motion with grouped statistics using [Pandas stats](http://pandas.pydata.org/pandas-docs/stable/api.html#api-dataframe-stats) functions and [pandas groupby](http://pandas.pydata.org/pandas-docs/stable/generated/pandas.DataFrame.groupby.html).  Below is an example for finding the means of all speaker subgroups.
 
-# In[9]:
+# In[79]:
 
 df_means = asl.df.groupby('speaker').mean()
 df_means
@@ -110,7 +105,7 @@ df_means
 
 # To select a mean that matches by speaker, use the pandas [map](http://pandas.pydata.org/pandas-docs/stable/generated/pandas.Series.map.html) method:
 
-# In[10]:
+# In[80]:
 
 asl.df['left-x-mean']= asl.df['speaker'].map(df_means['left-x'])
 asl.df.head()
@@ -118,7 +113,7 @@ asl.df.head()
 
 # ##### Try it!
 
-# In[11]:
+# In[81]:
 
 from asl_utils import test_std_tryit
 # TODO Create a dataframe named `df_std` with standard deviations grouped by speaker
@@ -148,7 +143,7 @@ test_std_tryit(df_std)
 #         - adding additional deltas
 # 
 
-# In[12]:
+# In[82]:
 
 # TODO add features for normalized by speaker values of left, right, x, y
 # Name these 'norm-rx', 'norm-ry', 'norm-lx', and 'norm-ly'
@@ -166,7 +161,7 @@ asl.df[features_norm[2]] = calculate_norm('left-x')
 asl.df[features_norm[3]] = calculate_norm('left-y')
 
 
-# In[13]:
+# In[83]:
 
 # TODO add features for polar coordinate values where the nose is the origin
 # Name these 'polar-rr', 'polar-rtheta', 'polar-lr', and 'polar-ltheta'
@@ -186,7 +181,7 @@ asl.df[features_polar[2]] = calculate_polar_radius('grnd-lx','grnd-ly')
 asl.df[features_polar[3]] = calculate_polar_theta('grnd-lx','grnd-ly')
 
 
-# In[14]:
+# In[84]:
 
 # TODO add features for left, right, x, y differences by one time step, i.e. the "delta" values discussed in the lecture
 # Name these 'delta-rx', 'delta-ry', 'delta-lx', and 'delta-ly'
@@ -202,24 +197,30 @@ asl.df[features_delta[2]] = calculate_diff('left-x')
 asl.df[features_delta[3]] = calculate_diff('left-y')
 
 
-# In[15]:
+# In[85]:
 
 # TODO add features of your own design, which may be a combination of the above or something else
 # Name these whatever you would like
+features_ground_norm = ['grnd-norm-rx', 'grnd-norm-ry', 'grnd-norm-lx', 'grnd-norm-ly']
+asl.df[features_ground_norm[0]] = calculate_norm(features_ground[0])
+asl.df[features_ground_norm[1]] = calculate_norm(features_ground[1])
+asl.df[features_ground_norm[2]] = calculate_norm(features_ground[2])
+asl.df[features_ground_norm[3]] = calculate_norm(features_ground[3])
 
 # TODO define a list named 'features_custom' for building the training set
+features_custom = features_ground_norm
 
 
 # **Question 1:**  What custom features did you choose for the features_custom set and why?
 # 
-# **Answer 1:**
+# **Answer 1:** I choose to normalize the ground-features. The ground-features contains movements in x and y relative to the nose but different speakers would still cover different distances for the same word from one moventment to the other due to different arm lengths. Normalizing the ground-feature should eliminate this influence and make all movements in x and y uniform. 
 
 # <a id='part1_test'></a>
 # ### Features Unit Testing
 # Run the following unit tests as a sanity check on the defined "ground", "norm", "polar", and 'delta"
 # feature sets.  The test simply looks for some valid values but is not exhaustive.  However, the project should not be submitted if these tests don't pass.
 
-# In[16]:
+# In[86]:
 
 import unittest
 # import numpy as np
@@ -247,15 +248,94 @@ class TestFeatures(unittest.TestCase):
 suite = unittest.TestLoader().loadTestsFromModule(TestFeatures())
 unittest.TextTestRunner().run(suite)
 
-# from sklearn.model_selection import KFold
-#
-# training = asl.build_training(features_ground) # Experiment here with different feature sets
-# word = 'VEGETABLE' # Experiment here with different words
-# word_sequences = training.get_word_sequences(word)
-# split_method = KFold()
-# for cv_train_idx, cv_test_idx in split_method.split(word_sequences):
-#     print("Train fold indices:{} Test fold indices:{}".format(cv_train_idx, cv_test_idx))  # view indices of the folds
 
+# <a id='part2_tutorial'></a>
+# ## PART 2: Model Selection
+# ### Model Selection Tutorial
+# The objective of Model Selection is to tune the number of states for each word HMM prior to testing on unseen data.  In this section you will explore three methods: 
+# - Log likelihood using cross-validation folds (CV)
+# - Bayesian Information Criterion (BIC)
+# - Discriminative Information Criterion (DIC) 
+
+# ##### Train a single word
+# Now that we have built a training set with sequence data, we can "train" models for each word.  As a simple starting example, we train a single word using Gaussian hidden Markov models (HMM).   By using the `fit` method during training, the [Baum-Welch Expectation-Maximization](https://en.wikipedia.org/wiki/Baum%E2%80%93Welch_algorithm) (EM) algorithm is invoked iteratively to find the best estimate for the model *for the number of hidden states specified* from a group of sample seequences. For this example, we *assume* the correct number of hidden states is 3, but that is just a guess.  How do we know what the "best" number of states for training is?  We will need to find some model selection technique to choose the best parameter.
+
+# In[87]:
+
+import warnings
+from hmmlearn.hmm import GaussianHMM
+
+def train_a_word(word, num_hidden_states, features):
+    
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    training = asl.build_training(features)  
+    X, lengths = training.get_word_Xlengths(word)
+    model = GaussianHMM(n_components=num_hidden_states, n_iter=1000).fit(X, lengths)
+    logL = model.score(X, lengths)
+    return model, logL
+
+
+
+
+# The HMM model has been trained and information can be pulled from the model, including means and variances for each feature and hidden state.  The [log likelihood](http://math.stackexchange.com/questions/892832/why-we-consider-log-likelihood-instead-of-likelihood-in-gaussian-distribution) for any individual sample or group of samples can also be calculated with the `score` method.
+
+# In[88]:
+
+def show_model_stats(word, model):
+    print("Number of states trained in model for {} is {}".format(word, model.n_components))    
+    variance=np.array([np.diag(model.covars_[i]) for i in range(model.n_components)])    
+    for i in range(model.n_components):  # for each hidden state
+        print("hidden state #{}".format(i))
+        print("mean = ", model.means_[i])
+        print("variance = ", variance[i])
+        print()
+    
+
+
+
+# ##### Try it!
+# Experiment by changing the feature set, word, and/or num_hidden_states values in the next cell to see changes in values.  
+
+# In[89]:
+
+my_testword = 'CHOCOLATE'
+model, logL = train_a_word(my_testword, 3, features_ground) # Experiment here with different parameters
+show_model_stats(my_testword, model)
+print("logL = {}".format(logL))
+
+
+# ##### Visualize the hidden states
+# We can plot the means and variances for each state and feature.  Try varying the number of states trained for the HMM model and examine the variances.  Are there some models that are "better" than others?  How can you tell?  We would like to hear what you think in the classroom online.
+
+# In[90]:
+
+# In[91]:
+
+import math
+
+
+def visualize(word, model):
+    """ visualize the input model for a particular word """
+    variance=np.array([np.diag(model.covars_[i]) for i in range(model.n_components)])
+    figures = []
+    for parm_idx in range(len(model.means_[0])):
+        xmin = int(min(model.means_[:,parm_idx]) - max(variance[:,parm_idx]))
+        xmax = int(max(model.means_[:,parm_idx]) + max(variance[:,parm_idx]))
+        fig, axs = plt.subplots(model.n_components, sharex=True, sharey=False)
+        colours = cm.rainbow(np.linspace(0, 1, model.n_components))
+        for i, (ax, colour) in enumerate(zip(axs, colours)):
+            x = np.linspace(xmin, xmax, 100)
+            mu = model.means_[i,parm_idx]
+            sigma = math.sqrt(np.diag(model.covars_[i])[parm_idx])
+            ax.plot(x, mlab.normpdf(x, mu, sigma), c=colour)
+            ax.set_title("{} feature {} hidden state #{}".format(word, parm_idx, i))
+
+            ax.grid(True)
+        figures.append(plt)
+    for p in figures:
+        p.show()
+        
+visualize(my_testword, model)
 
 
 # #####  ModelSelector class
@@ -267,30 +347,18 @@ unittest.TextTestRunner().run(suite)
 # 
 # You will train each word in the training set with a range of values for the number of hidden states, and then score these alternatives with the model selector, choosing the "best" according to each strategy. The simple case of training with a constant value for `n_components` can be called using the provided `SelectorConstant` subclass as follow:
 
-# In[22]:
+# In[92]:
 
 from my_model_selectors import SelectorConstant
 
-# training = asl.build_training(features_ground)  # Experiment here with different feature sets defined in part 1
-# word = 'VEGETABLE' # Experiment here with different words
-# model = SelectorConstant(training.get_all_sequences(), training.get_all_Xlengths(), word, n_constant= 3).select()
-# print("Number of states trained in model for {} is {}".format(word, model.n_components))
-#
-#
-# # ##### Cross-validation folds
-# # If we simply score the model with the Log Likelihood calculated from the feature sequences it has been trained on, we should expect that more complex models will have higher likelihoods. However, that doesn't tell us which would have a better likelihood score on unseen data.  The model will likely be overfit as complexity is added.  To estimate which topology model is better using only the training data, we can compare scores using cross-validation.  One technique for cross-validation is to break the training set into "folds" and rotate which fold is left out of training.  The "left out" fold scored.  This gives us a proxy method of finding the best model to use on "unseen data". In the following example, a set of word sequences is broken into three folds using the [scikit-learn Kfold](http://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html) class object. When you implement `SelectorCV`, you will use this technique.
-#
-# # In[ ]:
-#
-# from sklearn.model_selection import KFold
-#
-# training = asl.build_training(features_ground) # Experiment here with different feature sets
-# word = 'VEGETABLE' # Experiment here with different words
-# word_sequences = training.get_word_sequences(word)
-# split_method = KFold()
-# for cv_train_idx, cv_test_idx in split_method.split(word_sequences):
-#     print("Train fold indices:{} Test fold indices:{}".format(cv_train_idx, cv_test_idx))  # view indices of the folds
 
+
+# ##### Cross-validation folds
+# If we simply score the model with the Log Likelihood calculated from the feature sequences it has been trained on, we should expect that more complex models will have higher likelihoods. However, that doesn't tell us which would have a better likelihood score on unseen data.  The model will likely be overfit as complexity is added.  To estimate which topology model is better using only the training data, we can compare scores using cross-validation.  One technique for cross-validation is to break the training set into "folds" and rotate which fold is left out of training.  The "left out" fold scored.  This gives us a proxy method of finding the best model to use on "unseen data". In the following example, a set of word sequences is broken into three folds using the [scikit-learn Kfold](http://scikit-learn.org/stable/modules/generated/sklearn.model_selection.KFold.html) class object. When you implement `SelectorCV`, you will use this technique.
+
+# In[93]:
+
+from sklearn.model_selection import KFold
 
 # **Tip:** In order to run `hmmlearn` training using the X,lengths tuples on the new folds, subsets must be combined based on the indices given for the folds.  A helper utility has been provided in the `asl_utils` module named `combine_sequences` for this purpose.
 
@@ -305,38 +373,40 @@ from my_model_selectors import SelectorConstant
 # 
 # **Tip:** The `hmmlearn` library may not be able to train or score all models.  Implement try/except contructs as necessary to eliminate non-viable models from consideration.
 
-# In[ ]:
+# In[94]:
 
 words_to_train = ['FISH', 'BOOK', 'VEGETABLE', 'FUTURE', 'JOHN']
 import timeit
 
 
-# In[ ]:
-
-# autoreload for automatically reloading changes made in my_model_selectors and my_recognizer
+# In[95]:
 
 
 
-# In[ ]:
+
+# In[96]:
 
 # TODO: Implement SelectorCV in my_model_selector.py
 from my_model_selectors import SelectorCV
 
+models = {"cv":{},"dic":{},"bic":{}}
 training = asl.build_training(features_ground)  # Experiment here with different feature sets defined in part 1
 sequences = training.get_all_sequences()
 Xlengths = training.get_all_Xlengths()
+
 for word in words_to_train:
     start = timeit.default_timer()
-    model = SelectorCV(sequences, Xlengths, word, 
+    model = SelectorCV(sequences, Xlengths, word,
                     min_n_components=2, max_n_components=15, random_state = 14).select()
     end = timeit.default_timer()-start
     if model is not None:
+        models["cv"][word] = model
         print("Training complete for {} with {} states with time {} seconds".format(word, model.n_components, end))
     else:
         print("Training failed for {}".format(word))
 
 
-# In[ ]:
+# In[97]:
 
 # TODO: Implement SelectorBIC in module my_model_selectors.py
 from my_model_selectors import SelectorBIC
@@ -346,16 +416,17 @@ sequences = training.get_all_sequences()
 Xlengths = training.get_all_Xlengths()
 for word in words_to_train:
     start = timeit.default_timer()
-    model = SelectorBIC(sequences, Xlengths, word, 
+    model = SelectorBIC(sequences, Xlengths, word,
                     min_n_components=2, max_n_components=15, random_state = 14).select()
     end = timeit.default_timer()-start
     if model is not None:
+        models["bic"][word] = model
         print("Training complete for {} with {} states with time {} seconds".format(word, model.n_components, end))
     else:
         print("Training failed for {}".format(word))
 
 
-# In[ ]:
+# In[98]:
 
 # TODO: Implement SelectorDIC in module my_model_selectors.py
 from my_model_selectors import SelectorDIC
@@ -365,24 +436,103 @@ sequences = training.get_all_sequences()
 Xlengths = training.get_all_Xlengths()
 for word in words_to_train:
     start = timeit.default_timer()
-    model = SelectorDIC(sequences, Xlengths, word, 
+    model = SelectorDIC(sequences, Xlengths, word,
                     min_n_components=2, max_n_components=15, random_state = 14).select()
     end = timeit.default_timer()-start
     if model is not None:
+        models["dic"][word] = model
         print("Training complete for {} with {} states with time {} seconds".format(word, model.n_components, end))
     else:
         print("Training failed for {}".format(word))
 
 
+# In[110]:
+
+import os
+
+shape = (len(words_to_train), len(words_to_train))
+scores_total = {
+    "cv": np.zeros(shape),
+    "bic": np.zeros(shape),
+    "dic": np.zeros(shape)
+}
+
+test = asl.build_training(features_ground, os.path.join('data', 'test_words.csv'))
+sequences = test.get_all_sequences()
+Xlengths = test.get_all_Xlengths()
+
+for selector_name in models.keys():
+    for model_word_idx in range(len(words_to_train)):
+        model_word = words_to_train[model_word_idx]
+        model = models[selector_name][model_word]
+        for other_word_idx in range(len(words_to_train)):
+            other_word = words_to_train[other_word_idx]
+            x, lengths = Xlengths[other_word]
+            try:
+                # set total of score
+                scores_total[selector_name][model_word_idx, other_word_idx] = model.score(x, lengths)                
+            except ValueError:
+                scores_total[selector_name][model_word_idx, other_word_idx] = -math.inf                
+                pass
+
+
+# In[115]:
+
+
+import itertools
+
+def plot_model_word_comparision(selector_name, title, plot_index):
+    model = models[selector_name]
+    scores_z = scores_total[selector_name]
+    scores_z_model_mean = np.mean(scores_z,1)
+    word_idx = np.arange(len(words_to_train) + 1)
+    scores_x, scores_y = np.meshgrid(word_idx, word_idx)
+    word_sums = np.ma.masked_invalid(scores_z).sum(axis=0)
+    scores_z_normalized_per_word = scores_z / (word_sums[np.newaxis,:])
+
+    figure = plt.figure(figsize=(10, 10))
+    ax_labels = figure.add_subplot(3, 1, plot_index)
+
+    ax = figure.add_subplot(3, 1, plot_index)
+    ax.set_title(f'Comparision {title}')
+    ax.pcolor(scores_x, scores_y, scores_z_normalized_per_word, norm=plt.Normalize(vmin=0, vmax=1), cmap=plt.get_cmap("BuGn"))
+    ax.set_xticks(word_idx)
+    ax.set_xticklabels(map(lambda w: f"{words_to_train[w]}", range(len(words_to_train))))
+    ax.set_yticks(word_idx)
+    ax.set_yticklabels(map(lambda w: f"Model {words_to_train[w]} ({model[words_to_train[w]].n_components} Sts./{len(Xlengths[words_to_train[w]][1])} Smp./ {round(scores_z_model_mean[w],0)} LogLi)", range(len(words_to_train))))
+
+    for x, y in itertools.product(np.arange(len(words_to_train)), repeat=2):
+        ax.annotate(scores_z[y][x], (x, y))
+
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+plot_model_word_comparision("cv", "Cross Validation", 1)
+plot_model_word_comparision("bic", "BIC", 2)
+plot_model_word_comparision("dic", "DIC", 3)
+plt.tight_layout()
+plt.show()
+
+
 # **Question 2:**  Compare and contrast the possible advantages and disadvantages of the various model selectors implemented.
 # 
-# **Answer 2:**
+# **Answer 2:** In the three graphs above for each selected HMM (Model) the log-likelihood from a test-set (test_words.csv) was evaluated and printed. Darker colors indicate the best log-likelhood per model. The properties of the selection algorithms are discussed below.
+# 
+# ### Cross Validation
+# Cross Validation has the best absolute Log-Likelihoods compared to BIC and DIC. It can be seen that cross validation generates a lot of States (e.g: Model for word "JOHN" has 12 States) at least compared to BIC. Even though it generates a lot of states the models here do not always yield the best likelihood for the word they were trained on (e.g Model for word "VEGETABLE" which assigns the best likelihood to the word "FUTURE"). This seems to happen when a model was only trained on a few samples. Regarding execution time, crossvalidation is also generally slower than BIC and DIC. This is especially true when a lot of test samples are available (e.g.: "JOHN"). Cross Validation seems generally inferior to BIC and DIC and has no advantages.
+# 
+# ### Bayesian Information Criterion(BIC)
+# BIC has the advantage that is generates very few states but still assigns in all cases the best likelihood to the word it was trained on.
+# 
+# ### Discriminative Information Criterion (DIC)
+# 
+# 
+# 
+# 
 
 # <a id='part2_test'></a>
 # ### Model Selector Unit Testing
 # Run the following unit tests as a sanity check on the implemented model selectors.  The test simply looks for valid interfaces  but is not exhaustive. However, the project should not be submitted if these tests don't pass.
 
-# In[ ]:
+# In[63]:
 
 from asl_test_model_selectors import TestSelectors
 suite = unittest.TestLoader().loadTestsFromModule(TestSelectors())
@@ -398,7 +548,7 @@ unittest.TextTestRunner().run(suite)
 # 
 # 
 
-# In[ ]:
+# In[64]:
 
 from my_model_selectors import SelectorConstant
 
@@ -423,7 +573,7 @@ print("Number of word models returned = {}".format(len(models)))
 # - the internal dictionary keys are the index of the test word rather than the word itself
 # - the getter methods are `get_all_sequences`, `get_all_Xlengths`, `get_item_sequences` and `get_item_Xlengths`
 
-# In[ ]:
+# In[65]:
 
 test_set = asl.build_test(features_ground)
 print("Number of test set items: {}".format(test_set.num_items))
@@ -436,41 +586,72 @@ print("Number of test set sentences: {}".format(len(test_set.sentences_index)))
 # 
 # **Tip:** The hmmlearn library may not be able to train or score all models.  Implement try/except contructs as necessary to eliminate non-viable models from consideration.
 
-# In[ ]:
+# In[66]:
 
 # TODO implement the recognize method in my_recognizer
 from my_recognizer import recognize
 from asl_utils import show_errors
 
 
-# In[ ]:
+# In[67]:
 
 # TODO Choose a feature set and model selector
-features = features_ground # change as needed
-model_selector = SelectorConstant # change as needed
+features = features_ground 
+model_selector = SelectorCV
 
-# TODO Recognize the test set and display the result with the show_errors method
 models = train_all_words(features, model_selector)
 test_set = asl.build_test(features)
 probabilities, guesses = recognize(models, test_set)
 show_errors(guesses, test_set)
 
 
-# In[ ]:
+# In[68]:
 
 # TODO Choose a feature set and model selector
-# TODO Recognize the test set and display the result with the show_errors method
+features = features_ground 
+model_selector = SelectorDIC
+
+models = train_all_words(features, model_selector)
+test_set = asl.build_test(features)
+probabilities, guesses = recognize(models, test_set)
+show_errors(guesses, test_set)
 
 
-# In[ ]:
+# In[69]:
 
 # TODO Choose a feature set and model selector
-# TODO Recognize the test set and display the result with the show_errors method
+features = features_polar
+model_selector = SelectorDIC
+
+models = train_all_words(features, model_selector)
+test_set = asl.build_test(features)
+probabilities, guesses = recognize(models, test_set)
+show_errors(guesses, test_set)
 
 
 # **Question 3:**  Summarize the error results from three combinations of features and model selectors.  What was the "best" combination and why?  What additional information might we use to improve our WER?  For more insight on improving WER, take a look at the introduction to Part 4.
 # 
-# **Answer 3:**
+# **Answer 3:** Following table show all tested combinations of Selectors and Features:
+# 
+# |Selector   | Feature       | WER                   |
+# |-----------|---------------|-----------------------|
+# | **CV**    |	**ground**  | 0.5449438202247191    |
+# | CV	    |	norm	    | 0.5898876404494382    |
+# | CV        |	delta	    | 0.6179775280898876    |
+# | CV	    |   polar	    | 0.5898876404494382    |
+# | **CV**	| **grnd-norm**	| 0.5617977528089888    |
+# | BIC	    |	ground	    | 0.6685393258426966    |
+# | BIC	    |	norm	    | 0.6853932584269663    |
+# | BIC	    |	delta	    | 0.6235955056179775    |
+# | BIC	    |	polar	    | 0.651685393258427     |
+# | BIC	    |	grnd-norm	| 0.6123595505617978    |
+# | **DIC**   |	**ground**  | 0.5617977528089888    |
+# | DIC	    |	norm	    | 0.6348314606741573    |
+# | DIC	    |	delta	    | 0.6179775280898876    |
+# | DIC       |	polar       | 0.5842696629213483    |
+# | DIC	    |	grnd-norm	| 0.5842696629213483    |
+# 
+# The best combination based on the test/training-set was Cross-Validation with the Ground feature. 
 
 # <a id='part3_test'></a>
 # ### Recognizer Unit Tests
