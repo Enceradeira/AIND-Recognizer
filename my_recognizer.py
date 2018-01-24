@@ -31,8 +31,6 @@ def recognize(models: dict, test_set: SinglesData):
 
 
 def recognize_word(word_idx, models, test_set):
-    word = test_set.wordlist[word_idx]
-    # word_sequences = test_set.get_item_sequences(word_idx)
 
     words_and_scores = dict(map(lambda m: score_word_with_model(word_idx, m, test_set), models.items()))
 

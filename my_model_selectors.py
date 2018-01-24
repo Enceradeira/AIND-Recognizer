@@ -87,7 +87,7 @@ class ModelSelectorUsingTrials(ModelSelector, ABC):
 
         trials = range(self.min_n_components, self.max_n_components)
         models_and_scores = list(map(lambda nr: (nr, self.scoreTrial(nr)), trials))
-        best_model_and_score = max(models_and_scores, key=lambda ms: ms[1])
+        best_model_and_score = self.min_or_max()(models_and_scores, key=lambda ms: ms[1])
         return self.base_model(best_model_and_score[0])
 
     @abstractmethod
@@ -95,9 +95,15 @@ class ModelSelectorUsingTrials(ModelSelector, ABC):
         """
         calculates a score for a model with the given number of components
         :param nr_components: nr of components for the model to be tested
-        :return: the score. A higher score is better, -inf if model is invalid
+        :return: the score
         """
         pass
+
+    @abstractmethod
+    def min_or_max(self):
+        """ decides whether min or max score is best for the Selector"""
+        pass
+
 
 class SelectorBIC(ModelSelectorUsingTrials):
     """ select the model with the lowest Bayesian Information Criterion(BIC) score
@@ -106,36 +112,40 @@ class SelectorBIC(ModelSelectorUsingTrials):
     Bayesian information criteria: BIC = -2 * logL + p * logN
     """
 
+    def min_or_max(self):
+        """ decides whether min or max score is best for the Selector"""
+        return min
+
     def scoreTrial(self, nr_components):
         """
         calculates a score for a model with the given number of components
         :param nr_components: nr of components for the model to be tested
-        :return: a score, a higher score is better, -inf if model is invalid
+        :return: a score
         """
 
         model = self.create_and_fit_model(nr_components, self.X, self.lengths)
         if not model:
             return -math.inf
 
+        # logL:
         log_likelihood = self.calculate_mean_score(model, self.X, self.lengths)
         assert model.covariance_type == "diag", "following calculation holds just for 'diag'"
 
-        # Following formula is minus 1 because one transition probability can be calculated by
-        # subtracting others from total probability which is 1
-        nr_transition_params = model.n_components * (model.n_components - 1)
+        # p:
+        # The number of free model parameters p is calculated from:
+        # - Transition probabilities: n*(n-1). It's (n-1) because last transition of state can be
+        #   calculated from others as they add up to a total probability 1
+        # - Starting probabilities: n-1
+        # - Nr of means: n*d
+        # - Nr of variances: n*d
 
-        # Per component (state) there is the output distribution per feature. The formula is minus
-        # 1 because one feature output probability can be calculated by subtracting others
-        # from total output probability which is 1
-        nr_output_params = model.n_components * (model.n_features - 1)
+        n = model.n_components
+        d = model.n_features
+        nr_params = n * n + 2 * n * d - 1
 
-        nr_params = nr_transition_params + nr_output_params
-
+        # logN
         nr_data_points = len(self.X)
-
-        # calculate bic negative because best score is highest by definition
-        negative_bic = 2 * log_likelihood - nr_params * math.log(nr_data_points)
-        return negative_bic
+        return  -2 * log_likelihood + nr_params * math.log(nr_data_points)
 
 
 class SelectorDIC(ModelSelectorUsingTrials):
@@ -148,11 +158,15 @@ class SelectorDIC(ModelSelectorUsingTrials):
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
     '''
 
+    def min_or_max(self):
+        """ decides whether min or max score is best for the Selector"""
+        return max
+
     def scoreTrial(self, nr_components):
         """
         calculates a score for a model with the given number of components
         :param nr_components: nr of components for the model to be tested
-        :return: the score. A higher score is better, -inf if model is invalid
+        :return: the score
         """
         words = self.words.keys()
         other_words = [k for k in words if k != self.this_word]
@@ -175,6 +189,11 @@ class SelectorDIC(ModelSelectorUsingTrials):
 class SelectorCV(ModelSelectorUsingTrials):
     ''' select best model based on average log Likelihood of cross-validation folds
     '''
+
+    def min_or_max(self):
+        """ decides whether min or max score is best for the Selector"""
+        return max
+
     def split_sequences(self, indices):
         training_sequences = [self.sequences[i] for i in indices]
         training_x = [evt for sequence in training_sequences for evt in sequence]
@@ -196,7 +215,7 @@ class SelectorCV(ModelSelectorUsingTrials):
         """
         nr_cross_validation_sets = min(3, len(self.sequences))
         if nr_cross_validation_sets == 1:
-            splits = [[[0],[0]]]
+            splits = [[[0], [0]]]
         else:
             splits = KFold(n_splits=nr_cross_validation_sets).split(self.sequences)
 
@@ -217,5 +236,3 @@ class SelectorCV(ModelSelectorUsingTrials):
             # score using 'test part' of test-set
             test_x, test_lengths = self.split_sequences(test_indices)
             return self.calculate_mean_score(model, test_x, test_lengths)
-
-
